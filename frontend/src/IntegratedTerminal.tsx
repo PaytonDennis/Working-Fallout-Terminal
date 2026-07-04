@@ -1,10 +1,29 @@
 // IntegratedTerminal.tsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import terminalVideo from "./assets/terminal.mp4";
 import TypingText from "./TypingText";
 
+type Box = { left: number; top: number; width: number; height: number };
+type Screen = "main" | "help" | "status";
+
+const HELP_TEXT =
+  "Available commands:\n  help - show this screen\n  status - show the backend message\n  back - return to the terminal";
+
 function IntegratedTerminal() {
   const [oopMessage, setOopMessage] = useState("Loading...");
+  const [videoBox, setVideoBox] = useState<Box>({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+  });
+  const [screen, setScreen] = useState<Screen>("main");
+  const [input, setInput] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("http://localhost:8080/api/message")
@@ -13,33 +32,100 @@ function IntegratedTerminal() {
       .catch(() => setOopMessage("Error fetching message"));
   }, []);
 
+  // Track the actual on-screen rectangle of the video (it's letterboxed via
+  // objectFit: "contain", so its rendered size/position shifts with the
+  // window's aspect ratio). Overlay elements are positioned relative to this
+  // rectangle instead of the viewport, so they stay put on the CRT screen
+  // no matter how the browser is resized.
+  useEffect(() => {
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+
+    const recompute = () => {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return;
+
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const videoRatio = vw / vh;
+      const containerRatio = cw / ch;
+
+      let width: number;
+      let height: number;
+      if (videoRatio > containerRatio) {
+        width = cw;
+        height = cw / videoRatio;
+      } else {
+        height = ch;
+        width = ch * videoRatio;
+      }
+
+      setVideoBox({
+        left: (cw - width) / 2,
+        top: (ch - height) / 2,
+        width,
+        height,
+      });
+    };
+
+    video.addEventListener("loadedmetadata", recompute);
+    const resizeObserver = new ResizeObserver(recompute);
+    resizeObserver.observe(container);
+    recompute();
+
+    return () => {
+      video.removeEventListener("loadedmetadata", recompute);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [screen, notice]);
+
+  const commands: Record<string, () => void> = {
+    help: () => setScreen("help"),
+    status: () => setScreen("status"),
+    back: () => setScreen("main"),
+    exit: () => setScreen("main"),
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const command = input.trim().toLowerCase();
+    setInput("");
+    if (!command) return;
+
+    const run = commands[command];
+    if (run) {
+      setNotice(null);
+      run();
+    } else {
+      setNotice(`Unknown command: ${command}`);
+    }
+  };
+
+  const hasBox = videoBox.width > 0 && videoBox.height > 0;
+
   return (
     <div
+      ref={containerRef}
       style={{
         position: "fixed",
-        top: "60px",
+        top: 0,
         left: 0,
         width: "100%",
-        height: "calc(100vh - 60px)",
+        height: "100vh",
         overflow: "hidden",
         zIndex: -1,
       }}
+      onClick={() => inputRef.current?.focus()}
     >
-      {/* Cursor cover */}
-      <div
-        style={{
-          position: "absolute",
-          top: "14%",
-          left: "36.2%",
-          width: "2%",
-          height: "2%",
-          backgroundColor: "black",
-          zIndex: 0,
-        }}
-      ></div>
-
       {/* Background video */}
       <video
+        ref={videoRef}
         src={terminalVideo}
         autoPlay
         loop
@@ -48,40 +134,91 @@ function IntegratedTerminal() {
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit: "contain",
           pointerEvents: "none",
         }}
       />
 
-      {/* Terminal text with typewriter effect */}
-      <div
-        style={{
-          position: "absolute",
-          top: "12.5%",
-          left: "19.5%",
-          width: "45%",
-          color: "#00ff00",
-          fontFamily: "monospace",
-          fontSize: "clamp(1rem, 2vw, 1.5rem)",
-          whiteSpace: "pre-wrap",
-        }}
-      >
-        <TypingText text={`>${oopMessage}`} />
+      {hasBox && (
+        <>
+          {/* Cursor cover: hides the video's own baked-in blinking cursor
+              (located at roughly 37%/19.4% of the frame, measured by
+              sampling the actual video pixels) */}
+          <div
+            style={{
+              position: "absolute",
+              top: videoBox.top + videoBox.height * 0.2,
+              left: videoBox.left + videoBox.width * 0.362,
+              width: videoBox.width * 0.03,
+              height: videoBox.height * 0.04,
+              backgroundColor: "black",
+              zIndex: 0,
+            }}
+          ></div>
 
-        {/* Blinking cursor */}
-        <span
-          style={{
-            display: "inline-block",
-            width: "10px",
-            height: "0.8em",
-            backgroundColor: "#00ff00",
-            marginLeft: "2px",
-            animation: "blink 1s steps(1) infinite",
-          }}
-        ></span>
-      </div>
+          {/* Terminal text + command prompt. Positioned/sized to the actual
+              CRT glass rectangle (measured by sampling the video's pixels:
+              glass spans ~35.5%-62% horizontally, ~15.3%-56.3% vertically
+              of the frame). */}
+          <div
+            ref={scrollRef}
+            style={{
+              position: "absolute",
+              top: videoBox.top + videoBox.height * 0.183,
+              left: videoBox.left + videoBox.width * 0.365,
+              width: videoBox.width * 0.24,
+              maxHeight: videoBox.height * 0.35,
+              overflowY: "auto",
+              overflowX: "hidden",
+              color: "#00ff00",
+              fontFamily: "monospace",
+              fontSize: `${videoBox.width * 0.022}px`,
+              whiteSpace: "pre-wrap",
+              overflowWrap: "break-word",
+            }}
+          >
+            {screen === "help" && <TypingText text={HELP_TEXT} />}
+            {screen === "status" && <TypingText text={`>${oopMessage}`} />}
 
-      {/* Cursor blink animation */}
+            {notice && <p>{notice}</p>}
+
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              <span>{">"}</span>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                autoFocus
+                style={{
+                  width: `${input.length}ch`,
+                  marginLeft: "4px",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  padding: 0,
+                  color: "#00ff00",
+                  caretColor: "transparent",
+                  fontFamily: "inherit",
+                  fontSize: "inherit",
+                }}
+              />
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "0.65em",
+                  height: "1em",
+                  backgroundColor: "#00ff00",
+                  animation: "blink 1s steps(1) infinite",
+                }}
+              ></span>
+            </form>
+          </div>
+        </>
+      )}
+
       <style>
         {`
           @keyframes blink {

@@ -14,18 +14,21 @@ export default function TypingText({
   const [displayed, setDisplayed] = useState("");
 
   useEffect(() => {
-    let i = 0;
+    setDisplayed("");
     const interval = setInterval(() => {
-      setDisplayed((prev) => prev + text[i]);
-      i++;
-      if (i >= text.length) {
-        clearInterval(interval);
-        onComplete && onComplete();
-      }
+      setDisplayed((prev) =>
+        prev.length < text.length ? prev + text[prev.length] : prev
+      );
     }, speed);
 
     return () => clearInterval(interval);
   }, [text, speed]);
+
+  useEffect(() => {
+    if (text.length > 0 && displayed.length === text.length) {
+      onComplete && onComplete();
+    }
+  }, [displayed, text, onComplete]);
 
   return <p className="text-green-400 font-mono">{displayed}</p>;
 }
