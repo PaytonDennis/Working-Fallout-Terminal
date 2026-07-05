@@ -143,31 +143,25 @@ function IntegratedTerminal() {
 
       {hasBox && (
         <>
-          {/* Cursor cover: hides the video's own baked-in blinking cursor
-              (located at roughly 37%/19.4% of the frame, measured by
-              sampling the actual video pixels) */}
           <div
             style={{
               position: "absolute",
-              top: videoBox.top + videoBox.height * 0.2,
-              left: videoBox.left + videoBox.width * 0.362,
-              width: videoBox.width * 0.03,
-              height: videoBox.height * 0.04,
+              top: videoBox.top + videoBox.height * 0.199,
+              left: videoBox.left + videoBox.width * 0.3611,
+              width: videoBox.width * 0.016,
+              height: videoBox.height * 0.017,
               backgroundColor: "black",
               zIndex: 0,
             }}
           ></div>
 
-          {/* Terminal text + command prompt. Positioned/sized to the actual
-              CRT glass rectangle (measured by sampling the video's pixels:
-              glass spans ~35.5%-62% horizontally, ~15.3%-56.3% vertically
-              of the frame). */}
+          {/* handling user inputs */}
           <div
             ref={scrollRef}
             className="terminal-scroll"
             style={{
               position: "absolute",
-              top: videoBox.top + videoBox.height * 0.192,
+              top: videoBox.top + videoBox.height * 0.19,
               left: videoBox.left + videoBox.width * 0.365,
               width: videoBox.width * 0.24,
               maxHeight: videoBox.height * 0.35,
@@ -221,7 +215,7 @@ function IntegratedTerminal() {
                   width: "0.65em",
                   height: "1em",
                   backgroundColor: "#00ff00",
-                  animation: "blink 1s steps(1) infinite",
+                  animation: "blink 0.6s steps(1) infinite",
                 }}
               ></span>
             </form>
@@ -229,6 +223,7 @@ function IntegratedTerminal() {
         </>
       )}
 
+      {/* Styling for the nav bar and blinking curser */}
       <style>
         {`
           @keyframes blink {
