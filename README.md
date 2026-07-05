@@ -7,3 +7,6 @@ Frontend: (frontend/, React + TS + Vite): IntegratedTerminal.tsx plays terminal.
 Flow: page loads → video renders → fetch hits /api/message → response gets typed onto the screen → user can type commands to navigate.
 
 Run: backend && ./mvnw spring-boot:run (port 8080), frontend && npm run dev (port 5173).
+
+
+<img width="1615" height="892" alt="falloutterminal" src="https://github.com/user-attachments/assets/d96642c0-37d2-4ea4-ba34-bcac92923b15" />
