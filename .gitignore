@@ -1,4 +1,4 @@
-# Editor / IDE
+# Editor / IDE configs to be ignored by git pushes
 .idea/
 .vscode/
 *.suo
