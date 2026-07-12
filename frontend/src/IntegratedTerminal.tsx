@@ -220,7 +220,6 @@ function IntegratedTerminal() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                autoFocus
                 style={{
                   width: `${input.length}ch`,
                   marginLeft: "4px",
