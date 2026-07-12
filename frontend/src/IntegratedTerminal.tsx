@@ -132,6 +132,7 @@ function IntegratedTerminal() {
         height: "100vh",
         overflow: "hidden",
         zIndex: -1,
+        backgroundColor: "black",
       }}
       onClick={() => inputRef.current?.focus()}
     >
