@@ -13,10 +13,11 @@ type Screen =
   | "status"
   | "vault boy"
   | "dwellers"
-  | "food storage";
+  | "food storage"
+  | "add dweller";
 
 const HELP_TEXT =
-  "Available commands:\n  help - show this screen\n  status - backend test \n  back - return to the terminal \n vault boy - displays the vault boy \n dwellers - Displays the Vault Dwellers Database \n food storage - shows food storage";
+  "Available commands:\n  help - show this screen\n  status - backend test \n  back - return to the terminal \n vault boy - displays the vault boy \n dwellers - Displays the Vault Dwellers Database \n food storage - shows food storage \n Add dweller - Add a new Vault dweller to the database";
 
 function IntegratedTerminal() {
   const [oopMessage, setOopMessage] = useState("Loading...");
@@ -29,6 +30,16 @@ function IntegratedTerminal() {
   const [screen, setScreen] = useState<Screen>("main");
   const [input, setInput] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [addDwellerStep, setAddDwellerStep] = useState<
+    "idle" | "name" | "age" | "occupation"
+  >("idle");
+  const [newDweller, setNewDweller] = useState({
+    name: "",
+    age: "",
+    occupation: "",
+  });
+  const [history, setHistory] = useState<string[]>([]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,14 +113,74 @@ function IntegratedTerminal() {
     "vault boy": () => setScreen("vault boy"),
     dwellers: () => setScreen("dwellers"),
     "food storage": () => setScreen("food storage"),
+    "add dweller": () => {
+      setScreen("add dweller");
+      setAddDwellerStep("name");
+      setHistory(["Dweller name:"]);
+    },
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const command = input.trim().toLowerCase();
+    const value = input.trim();
     setInput("");
-    if (!command) return;
+    if (!value) return;
 
+    // Allow bailing out of the add-dweller flow at any step
+    if (addDwellerStep !== "idle") {
+      const lower = value.toLowerCase();
+      if (lower === "back" || lower === "exit") {
+        setAddDwellerStep("idle");
+        setNewDweller({ name: "", age: "", occupation: "" });
+        setHistory([]);
+        setNotice(null);
+        setScreen("main");
+        return;
+      }
+    }
+
+    // If we're mid-way through adding a dweller, capture the answer
+    if (addDwellerStep === "name") {
+      setNewDweller((prev) => ({ ...prev, name: value }));
+      setHistory((prev) => [...prev, `> ${value}`, "Dweller age:"]);
+      setAddDwellerStep("age");
+      return;
+    }
+
+    if (addDwellerStep === "age") {
+      setNewDweller((prev) => ({ ...prev, age: value }));
+      setHistory((prev) => [...prev, `> ${value}`, "Dweller occupation:"]);
+      setAddDwellerStep("occupation");
+      return;
+    }
+
+    if (addDwellerStep === "occupation") {
+      const finalDweller = { ...newDweller, occupation: value };
+      setHistory((prev) => [...prev, `> ${value}`, "Saving..."]);
+      setAddDwellerStep("idle");
+
+      fetch("http://localhost:8080/api/dwellers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: finalDweller.name,
+          age: parseInt(finalDweller.age),
+          occupation: finalDweller.occupation,
+        }),
+      })
+        .then((res) => res.json())
+        .then(() => {
+          setHistory((prev) => [...prev, "Dweller saved successfully."]);
+          setNewDweller({ name: "", age: "", occupation: "" });
+        })
+        .catch(() => {
+          setHistory((prev) => [...prev, "Error saving dweller."]);
+        });
+      return;
+    }
+
+    // Normal command handling (only runs when NOT mid-add-dweller-flow)
+    const command = value.toLowerCase();
     const run = commands[command];
     if (run) {
       setNotice(null);
@@ -208,6 +279,13 @@ function IntegratedTerminal() {
                 style={{ width: "60%" }}
               />
             )}
+
+            {screen === "add dweller" &&
+              history.map((line, i) => (
+                <p key={i} style={{ textAlign: "left" }}>
+                  {line}
+                </p>
+              ))}
 
             {notice && <p>{notice}</p>}
 

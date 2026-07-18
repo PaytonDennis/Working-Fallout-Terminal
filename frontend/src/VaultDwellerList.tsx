@@ -20,4 +20,5 @@ function VaultDwellerList() {
     </div>
   );
 }
+
 export default VaultDwellerList;
